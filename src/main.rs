@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use bevy::{prelude::*, window::WindowResolution};
+use bevy::{
+    prelude::*,
+    window::{EnabledButtons, WindowResolution},
+};
 
 mod game;
 mod game_over;
@@ -32,13 +35,18 @@ fn main() {
                         title: String::from("Flappy Bird"),
                         resolution: WindowResolution::new(288.0, 512.0),
                         resizable: false,
+                        enabled_buttons: EnabledButtons {
+                            maximize: false,
+                            minimize: false,
+                            close: true,
+                        },
                         ..default()
                     }),
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_state::<GameState>()
+        .init_state::<GameState>()
         .add_systems(Startup, scene_setup)
         .add_plugins((
             game::GamePlugin,
@@ -95,8 +103,8 @@ fn scene_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 // Return true if the user has clicked, tapped or pressed the space bar
 pub fn has_user_input(
-    keyboard_input: Res<Input<KeyCode>>,
-    mouse_button_input: Res<Input<MouseButton>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     touch_input: Res<Touches>,
 ) -> bool {
     keyboard_input.just_pressed(KeyCode::Space)
