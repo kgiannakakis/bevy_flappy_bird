@@ -1,6 +1,6 @@
 use super::BIRD_Z;
-use crate::{game_over::DespawnOnReset, has_user_input, GameState, Ground, Scroll, GROUND_WIDTH};
-use crate::{AudioHandles, BIRD_SIZE};
+use crate::{AudioHandles, BIRD_USIZE};
+use crate::{GROUND_WIDTH, GameState, Ground, Scroll, game_over::DespawnOnReset, has_user_input};
 use bevy::prelude::*;
 use bird::Bird;
 
@@ -16,7 +16,7 @@ const DEATH_HEIGHT: f32 = -125.0;
 const PIPE_SPAWN_OFFSET: f32 = 180.0;
 const PIPE_SPAWN_TIME: f32 = 4.0;
 const GAP_HEIGHT: f32 = 100.0;
-const BIRD_ANIMATION_SPEED: f32 = 10.0;
+//const BIRD_ANIMATION_SPEED: f32 = 10.0;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum PlayState {
@@ -59,7 +59,7 @@ impl Plugin for GamePlugin {
                     scroll,
                     reuse_ground,
                 )
-                    .run_if(in_state(GameState::Playing).and_then(in_state(PlayState::Normal))),
+                    .run_if(in_state(GameState::Playing).and(in_state(PlayState::Normal))),
             )
             .add_systems(
                 Update,
@@ -91,6 +91,15 @@ struct Pipe;
 #[derive(Component)]
 struct ApproachingPipe;
 
+#[derive(Component, Default)]
+pub struct AnimationIndices {
+    pub first: usize,
+    pub last: usize,
+}
+
+#[derive(Component, Deref, DerefMut)]
+pub struct AnimationTimer(pub Timer);
+
 fn game_setup(
     mut commands: Commands,
     mut play_state: ResMut<NextState<PlayState>>,
@@ -99,49 +108,46 @@ fn game_setup(
 ) {
     // Load the bird sprite sheet and create a texture atlas from it
     let atlas_layout =
-        texture_atlases.add(TextureAtlasLayout::from_grid(BIRD_SIZE, 4, 1, None, None));
+        texture_atlases.add(TextureAtlasLayout::from_grid(BIRD_USIZE, 4, 1, None, None));
 
     // Spawn the bird
     commands.spawn((
         Bird::default(),
         DespawnOnReset,
-        SpriteSheetBundle {
-            atlas: TextureAtlas {
+        Sprite::from_atlas_image(
+            asset_server.load("sprites/bird.png"),
+            TextureAtlas {
                 layout: atlas_layout,
                 index: 0,
             },
-            texture: asset_server.load("sprites/bird.png"),
-            transform: Transform::from_xyz(0.0, 0.0, BIRD_Z),
-            ..Default::default()
-        },
+        ),
+        Transform::from_xyz(0.0, 0.0, BIRD_Z),
+        AnimationIndices { first: 0, last: 3 },
+        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
     ));
 
     // Spawn the score UI
     commands
         .spawn((
             DespawnOnReset,
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    justify_content: JustifyContent::Center,
-                    ..Default::default()
-                },
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
                 ..Default::default()
             },
         ))
         .with_children(|node| {
             node.spawn((
                 ScoreText,
-                TextBundle::from_section(
-                    "0",
-                    TextStyle {
-                        font: asset_server.load("fonts/flappybird.ttf"),
-                        font_size: 80.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_text_justify(JustifyText::Center),
+                Text::new("0"),
+                TextFont {
+                    font: asset_server.load("fonts/flappybird.ttf"),
+                    font_size: 80.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                TextLayout::new_with_justify(Justify::Center),
             ));
         });
 
@@ -150,20 +156,24 @@ fn game_setup(
 }
 
 // Set the score text to display the current score
-fn update_score_text(mut query: Query<&mut Text, With<ScoreText>>, score: Res<Score>) {
+fn update_score_text(
+    mut query: Query<Entity, With<ScoreText>>,
+    mut writer: TextUiWriter,
+    score: Res<Score>,
+) {
     if !score.is_changed() {
         return;
     }
 
-    for mut text in &mut query {
-        text.sections[0].value = score.0.to_string();
+    for entity in &mut query {
+        *writer.text(entity, 0) = score.0.to_string();
     }
 }
 
 // Scroll all entities with the Scroll component
 fn scroll(mut query: Query<&mut Transform, With<Scroll>>, time: Res<Time>) {
     for mut transform in &mut query {
-        transform.translation.x -= SCROLL_SPEED * time.delta_seconds();
+        transform.translation.x -= SCROLL_SPEED * time.delta_secs();
     }
 }
 
@@ -194,22 +204,13 @@ fn reset_timer(mut timer: ResMut<PipeSpawnTimer>) {
 }
 
 fn flap_sound(audio_handles: Res<AudioHandles>, mut commands: Commands) {
-    commands.spawn(AudioBundle {
-        source: audio_handles.flap.clone(),
-        ..default()
-    });
+    commands.spawn(AudioPlayer::<AudioSource>(audio_handles.flap.clone()));
 }
 
 fn hit_sound(audio_handles: Res<AudioHandles>, mut commands: Commands) {
-    commands.spawn(AudioBundle {
-        source: audio_handles.hit.clone(),
-        ..default()
-    });
+    commands.spawn(AudioPlayer::<AudioSource>(audio_handles.hit.clone()));
 }
 
 fn point_sound(audio_handles: Res<AudioHandles>, mut commands: Commands) {
-    commands.spawn(AudioBundle {
-        source: audio_handles.point.clone(),
-        ..default()
-    });
+    commands.spawn(AudioPlayer::<AudioSource>(audio_handles.point.clone()));
 }

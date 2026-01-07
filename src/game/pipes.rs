@@ -1,7 +1,7 @@
-use super::{bird::Bird, ApproachingPipe, Pipe, PipeSpawnTimer, PlayState, Score};
+use super::{ApproachingPipe, Pipe, PipeSpawnTimer, PlayState, Score, bird::Bird};
 use super::{GAP_HEIGHT, PIPE_SPAWN_OFFSET};
 use crate::game_over::DespawnOnReset;
-use crate::{Scroll, BIRD_SIZE, PIPE_SIZE, PIPE_Z};
+use crate::{BIRD_SIZE, PIPE_SIZE, PIPE_Z, Scroll};
 use bevy::math::bounding::{Aabb2d, IntersectsVolume};
 use bevy::prelude::*;
 use rand::Rng;
@@ -15,7 +15,7 @@ pub(super) fn spawn_pipe(
 ) {
     timer.0.tick(time.delta());
 
-    if !timer.0.finished() {
+    if !timer.0.is_finished() {
         return;
     }
 
@@ -29,26 +29,20 @@ pub(super) fn spawn_pipe(
         ApproachingPipe,
         Scroll,
         DespawnOnReset,
-        SpriteBundle {
-            texture: texture.clone(),
-            transform: Transform::from_xyz(PIPE_SPAWN_OFFSET, y - 160.0, PIPE_Z),
-            ..Default::default()
-        },
+        Sprite::from_image(texture.clone()),
+        Transform::from_xyz(PIPE_SPAWN_OFFSET, y - 160.0, PIPE_Z),
     ));
 
     commands.spawn((
         Pipe,
         Scroll,
         DespawnOnReset,
-        SpriteBundle {
-            texture,
-            transform: Transform::from_xyz(PIPE_SPAWN_OFFSET, y + 160.0 + GAP_HEIGHT, PIPE_Z),
-            sprite: Sprite {
-                flip_y: true,
-                ..Default::default()
-            },
+        Sprite {
+            image: texture,
+            flip_y: true,
             ..Default::default()
         },
+        Transform::from_xyz(PIPE_SPAWN_OFFSET, y + 160.0 + GAP_HEIGHT, PIPE_Z),
     ));
 }
 
@@ -68,7 +62,7 @@ pub(super) fn check_passed_pipe(
     pipes: Query<(Entity, &Transform), With<ApproachingPipe>>,
     bird: Query<&Transform, With<Bird>>,
 ) {
-    let bird = bird.single();
+    let bird = bird.single().unwrap();
     for (entity, pipe) in &pipes {
         if pipe.translation.x + PIPE_SIZE.x / 2.0 < bird.translation.x - BIRD_SIZE.x / 2.0 {
             commands.entity(entity).remove::<ApproachingPipe>();
@@ -84,9 +78,9 @@ pub(super) fn check_pipe_collision(
     bird: Query<&Transform, With<Bird>>,
     pipes: Query<&Transform, With<Pipe>>,
 ) {
-    let bird = bird.single();
+    let bird = bird.single().unwrap();
     for pipe in &pipes {
-        let collision = Aabb2d::new(bird.translation.xy(), BIRD_SIZE / 2.00)
+        let collision = Aabb2d::new(bird.translation.xy(), BIRD_SIZE / 2.0)
             .intersects(&Aabb2d::new(pipe.translation.xy(), PIPE_SIZE / 2.0));
         if collision {
             play_state.set(PlayState::HitPipe);

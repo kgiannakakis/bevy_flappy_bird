@@ -14,6 +14,7 @@ const GROUND_Z: f32 = 2.0;
 const BIRD_Z: f32 = 3.0;
 const UI_Z: f32 = 4.0;
 
+const BIRD_USIZE: UVec2 = UVec2::new(34, 24);
 const BIRD_SIZE: Vec2 = Vec2::new(34.0, 24.0);
 const PIPE_SIZE: Vec2 = Vec2::new(52.0, 320.0);
 const GROUND_WIDTH: f32 = 336.0;
@@ -33,7 +34,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: String::from("Flappy Bird"),
-                        resolution: WindowResolution::new(288.0, 512.0),
+                        resolution: WindowResolution::new(288, 512),
                         resizable: false,
                         enabled_buttons: EnabledButtons {
                             maximize: false,
@@ -71,13 +72,12 @@ struct Ground;
 
 fn scene_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Spawn a 2D camera
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 
     // Spawn the background sprite
-    commands.spawn(SpriteBundle {
-        texture: asset_server.load("sprites/background.png"),
-        ..Default::default()
-    });
+    commands.spawn(Sprite::from_image(
+        asset_server.load("sprites/background.png"),
+    ));
 
     // Spawn 2 ground sprites so that they can scroll infinitely
     let texture_handle = asset_server.load("sprites/ground.png");
@@ -85,11 +85,8 @@ fn scene_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         commands.spawn((
             Ground,
             Scroll,
-            SpriteBundle {
-                texture: texture_handle.clone(),
-                transform: Transform::from_xyz(i as f32 * GROUND_WIDTH, -200.0, GROUND_Z),
-                ..Default::default()
-            },
+            Sprite::from_image(texture_handle.clone()),
+            Transform::from_xyz(i as f32 * GROUND_WIDTH, -200.0, GROUND_Z),
         ));
     }
 
@@ -115,6 +112,6 @@ pub fn has_user_input(
 // Despawn all entities recursively with a given component
 pub fn cleanup<T: Component>(mut commands: Commands, query: Query<Entity, With<T>>) {
     for entity in query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
